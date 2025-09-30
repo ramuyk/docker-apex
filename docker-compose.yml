@@ -1,0 +1,58 @@
+services:
+  oracle-db:
+    image: container-registry.oracle.com/database/express:21.3.0-xe
+    container_name: oracle-xe
+    environment:
+      ORACLE_PWD: oracle
+      ORACLE_CHARACTERSET: AL32UTF8
+    ports:
+      - "1521:1521"
+      - "5500:5500"
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+      - oracle_setup:/opt/oracle/scripts/setup
+    shm_size: 2gb
+    mem_limit: 4gb
+    memswap_limit: 4gb
+    healthcheck:
+      test: ["CMD", "sqlplus", "-s", "system/oracle@localhost:1521/XE", "<<<", "SELECT 1 FROM DUAL;"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - apex_network
+
+  apex:
+    build:
+      context: .
+      dockerfile: Dockerfile.apex
+    container_name: apex-server
+    environment:
+      ORACLE_USER: system
+      ORACLE_PASSWORD: oracle
+      DB_HOST: oracle-db
+      DB_PORT: 1521
+      DB_SERVICE: XE
+      APEX_ADMIN_PASSWORD: Welcome1
+      APEX_LISTENER_PASSWORD: Welcome1
+      APEX_REST_PASSWORD: Welcome1
+      APEX_PUBLIC_PASSWORD: Welcome1
+    ports:
+      - "8081:8080"
+    depends_on:
+      oracle-db:
+        condition: service_healthy
+    networks:
+      - apex_network
+    volumes:
+      - apex_config:/opt/ords/config
+
+volumes:
+  oracle_data:
+  oracle_setup:
+  apex_config:
+
+networks:
+  apex_network:
+    driver: bridge
